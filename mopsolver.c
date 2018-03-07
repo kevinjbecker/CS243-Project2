@@ -13,6 +13,9 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define WALL 'O'
+#define EMPTY ' '
+
 // our Queue node system
 typedef struct qnode_s{
     struct qnode_s *next;
@@ -48,15 +51,27 @@ static void fileCat(char **dest, const char *str)
 
 static char **processFile(char *file)
 {
-    // determines N
-    int i = 0, n = 0;
-    // when we hit a newline we stop
+    // the data we need to store (on the stack)
+    size_t rows, i = 0, cols = 0;
+    // we count the number of columns to include
     while(file[i] != '\n')
-        // if we have a number, we want to record that information
-        if(file[i++]!= ' ')
-            n++;
+        if(file[i++] != ' ')
+            ++cols;
     
+    /* the number of columns is equal to the size of the string divided by two 
+       times the number of columns */
+    rows = (strlen(file) / (2 * cols));
     
+    // begins to build our maze by first allocating our space
+    char **maze = NULL;
+    // contiguously allocates the right number of rows
+    maze = calloc(sizeof(char *), rows);
+    
+    // contiguously allocates the columns for each row
+    for(size_t row = 0; row < rows; ++row)
+        maze[row] = calloc(sizeof(char), cols);
+    
+    return NULL;
 }
 
 
@@ -104,6 +119,7 @@ int main(int argc, char **argv)
                 // open our output file in a+ mode which will create the file
                 // if it doesn't exist
                 fileOut = fopen(optarg, "a+");
+                // if we have an error we report it here
                 if(fileOut == NULL)
                     perror("Error opening output file");
                 break;
@@ -133,9 +149,6 @@ int main(int argc, char **argv)
     
     // process file string to create our maze
     char **maze = processFile(file);
-    
-    if(prettyPrint)
-        prettyPrint(maze);
     
     // frees our file; we're done with it
     free(file);
