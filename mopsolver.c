@@ -10,19 +10,14 @@
 #define _DEFAULT_SOURCE
 #include <unistd.h> // getopt
 #include <stdio.h> // printing
+#include <string.h>
 #include <stdlib.h>
 
 // our Queue node system
 typedef struct qnode_s{
-    QNode *next;
+    struct qnode_s *next;
     size_t x, y; // the x and y coordinates
 } QNode;
-
-// used for reading in the data
-typedef struct line_s{
-    Line *child;
-    char *data;
-} Line;
 
 
 void printHelpMsg(char *start)
@@ -38,17 +33,30 @@ void printHelpMsg(char *start)
            "-p Print solution with path.         (Default: off)\n"
            "-i INFILE Read maze from INFILE      (Default: stdin)\n"
            "-o OUTFILE Write maze to OUTFILE     (Default: stdout)\n", start);
-    exit(EXIT_FAILURE);
 }
 
 
-
-
-
-void addLine(Line **root, size_t size, char *line)
+static void fileCat(char **dest, const char *str)
 {
-    Line *lowest = NULL;
-    lowest = findLowest(*root);
+    // resizes the "file" string
+    *dest = realloc(*dest, (strlen(*dest) + strlen(str) + 1));
+    
+    //concatenates the strings
+    strcat(*dest, str);
+}
+
+
+static char **processFile(char *file)
+{
+    // determines N
+    int i = 0, n = 0;
+    // when we hit a newline we stop
+    while(file[i] != '\n')
+        // if we have a number, we want to record that information
+        if(file[i++]!= ' ')
+            n++;
+    
+    
 }
 
 
@@ -66,9 +74,10 @@ int main(int argc, char **argv)
             // help menu and quit
             case 'h':
                 printHelpMsg(argv[0]);
+                return EXIT_SUCCESS;
                 break;
             // flad which will add border and pretty print the read in maze
-            case 'b':
+            case 'b': 
                 prettyPrint = 1;
                 break;
             // flag to print the number of steps in the solution
@@ -101,25 +110,36 @@ int main(int argc, char **argv)
         }
     }
     
-    printf("starting point: prettyPrint=%d, solutionSteps=%d, matrix=%d, "
-           "path=%d\n", prettyPrint, solutionSteps, matrix, path);
-
-    // -1 so we can determine what to do later
-    int numLines = 0;
+    printf("status: pret=%d, sol=%d, mat=%d, pat=%d\n", prettyPrint, solutionSteps, matrix, path);
+    
     char *line = NULL;
     size_t linesize = 0;
-    
-    // some temporary heap 2d char array
-    // used so that we can read in the entire file to memory and work from there
-    
-    Line *maze = NULL;
-    maze->next = NULL;
+    // allocates our empty filestring
+    char *file = malloc(strlen("") +1);
+    strcpy(file, "");
     
     while(getline(&line, &linesize, fileIn) > 0)
-    {
-        addLine(&maze, line, 
-        ++numLines;
-    }
+        fileCat(&file, line);
+    
+    // frees our line; we're done with it
+    free(line);
+    line = NULL;
+    
+    
+    // prints our matrix if we were asked to do so by the user
+    // there is a new line at the end of our matrix so we don't need to add that.
+    if(matrix)
+        printf("Read this matrix:\n%s", file);
+    
+    // process file string to create our maze
+    char **maze = processFile(file);
+    
+    if(prettyPrint)
+        prettyPrint(maze);
+    
+    // frees our file; we're done with it
+    free(file);
+    file = NULL;
 
     return EXIT_SUCCESS;
 }
