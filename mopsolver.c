@@ -39,39 +39,121 @@ void printHelpMsg(char *start)
 }
 
 
-static void fileCat(char **dest, const char *str)
+static void fileCat(char **file, const char *str)
 {
     // resizes the "file" string
-    *dest = realloc(*dest, (strlen(*dest) + strlen(str) + 1));
+    *file = realloc(*file, (strlen(*file) + strlen(str) + 1));
     
     //concatenates the strings
-    strcat(*dest, str);
+    strcat(*file, str);
 }
 
 
-static char **processFile(char *file)
+static size_t getNumCols(char *file)
 {
-    // the data we need to store (on the stack)
-    size_t rows, i = 0, cols = 0;
-    // we count the number of columns to include
+    // index counter, cols counter
+    size_t i = 0, cols = 0;
+    
+    // counts the number of non-space characters before first new line
     while(file[i] != '\n')
         if(file[i++] != ' ')
             ++cols;
     
-    /* the number of columns is equal to the size of the string divided by two 
-       times the number of columns */
-    rows = (strlen(file) / (2 * cols));
+    // returns the number of columns we have
+    return cols;
+}
+
+
+static char ** processMaze(const char *file, 
+                           const size_t rows, 
+                           const size_t cols)
+{
+    // row/column index counters
+    size_t r, c;
     
-    // begins to build our maze by first allocating our space
+    // our eventual storage location for our maze
     char **maze = NULL;
     // contiguously allocates the right number of rows
     maze = calloc(sizeof(char *), rows);
     
     // contiguously allocates the columns for each row
-    for(size_t row = 0; row < rows; ++row)
-        maze[row] = calloc(sizeof(char), cols);
+    for(r = 0; r < rows; ++r)
+        maze[r] = calloc(sizeof(char), cols);
     
-    return NULL;
+    /* goes through each row and column and sets it to the proper value based
+       on the file string 
+       NOTE: the index in the file string is: (row * rows * 2) + (col * 2) */
+    for(r = 0; r < rows; ++r)
+        for(c = 0; c < cols; ++c)
+            maze[r][c] = (file[(rows * (r * 2)) + (c * 2)] == '0') ? 0 : 1;
+    
+    // we have finished building our maze we can now return it
+    return maze;
+}
+
+static void emptyMaze(char **maze, const size_t rows)
+{
+    // frees each individual row
+    for(size_t r = 0; r < rows; ++r)
+        free(maze[r]);
+    
+    // finally frees our maze
+    free(maze);
+}
+
+
+static void printBorder(const size_t cols)
+{
+    // prints our top border
+    for(size_t i = 0; i < cols * 2 + 3; ++i)
+        printf("%c", WALL);
+    // prints the new line character at the end
+    printf("\n");
+}
+
+
+static void prettyPrintMaze(char **maze, const size_t rows, const size_t cols)
+{
+    // prints our border
+    printBorder(cols);
+    
+    // goes through and prints each character
+    for(size_t r = 0; r < rows; ++r)
+    {
+        // if r is anything but 0, print a wall (border)
+        printf("%c", (r) ? WALL : EMPTY);
+        for(size_t c = 0; c < cols; ++c)
+            printf(" %c", (maze[r][c]) ? WALL : EMPTY);
+        // if r is anything but rows-1 print a wall (border)
+        printf(" %c\n", (r != rows-1) ? WALL : EMPTY);
+    }
+    
+    // again prints our border
+    printBorder(cols);
+}
+
+
+static char * readMazeFromFile(FILE *fileIn)
+{
+    // the line buffer getline will write to
+    char *buf = NULL;
+    // the linesize getline will change
+    size_t bufsize = 0;
+    // allocates our empty filestring
+    char *file = malloc(strlen("") +1);
+    // copies in an empty string
+    strcpy(file, "");
+    
+    // while we still read in lines
+    while(getline(&buf, &bufsize, fileIn) > 0)
+        fileCat(&file, buf);
+    
+    // frees our buffer; we're done with it
+    free(buf);
+    buf = NULL;
+    
+    // return our file
+    return file;
 }
 
 
@@ -79,7 +161,14 @@ int main(int argc, char **argv)
 {
     // these are used for after we read in our stuff
     unsigned char prettyPrint = 0, solutionSteps = 0, matrix = 0, path = 0;
+    
+    // holds the number of rows and columns in our matrix
+    int rows = 0, cols = 0;
+    
+    // sets our default file in and out
     FILE *fileIn = stdin, *fileOut = stdout;
+    
+    // begins the processing of the flags
     char opt;
     // parses our flags (if any are present)
     while((opt = getopt(argc, argv, "hbsmpi:o:")) != -1)
@@ -126,34 +215,42 @@ int main(int argc, char **argv)
         }
     }
     
-    printf("status: pret=%d, sol=%d, mat=%d, pat=%d\n", prettyPrint, solutionSteps, matrix, path);
+    // reads in our file string
+    char *file = readMazeFromFile(fileIn);
     
-    char *line = NULL;
-    size_t linesize = 0;
-    // allocates our empty filestring
-    char *file = malloc(strlen("") +1);
-    strcpy(file, "");
+    // we are done reading in from the file, close it if necessary
+    if(fileIn != stdin)
+        fclose(fileIn);
     
-    while(getline(&line, &linesize, fileIn) > 0)
-        fileCat(&file, line);
-    
-    // frees our line; we're done with it
-    free(line);
-    line = NULL;
-    
-    
-    // prints our matrix if we were asked to do so by the user
-    // there is a new line at the end of our matrix so we don't need to add that.
+    /* prints our matrix if we were asked to do so by the user
+       there is a new line at the end of our matrix, we don't need an extra */
     if(matrix)
         printf("Read this matrix:\n%s", file);
     
-    // process file string to create our maze
-    char **maze = processFile(file);
+    // determines the number of columns and rows we are dealing with
+    cols = getNumCols(file);
+    rows = (strlen(file) / (2 * cols));
     
-    // frees our file; we're done with it
+    // process file string to create our maze
+    char **maze = processMaze(file, rows, cols);
+    
+    // file is all done, we can free it here
     free(file);
     file = NULL;
+    
+    // pretty prints our board if we were asked to do so by user
+    if(prettyPrint)
+        prettyPrintMaze(maze, rows, cols);
 
+    // empties out the maze
+    emptyMaze(maze, rows);
+    maze = NULL;
+    
+    
+    // if we need to close the output file we do it right before exit
+    if(fileOut != stdout)
+        fclose(fileOut);
+        
     return EXIT_SUCCESS;
 }
 
