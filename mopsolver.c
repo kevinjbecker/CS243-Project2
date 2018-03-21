@@ -8,8 +8,6 @@
 // // // // // // // // // // // // // // // // // // // // // // // // // // //
 
 // TODO: make sure all references are actually using the correct x and y
-// x => col
-// y => row
 
 #define _DEFAULT_SOURCE
 #include <unistd.h> // getopt
@@ -83,10 +81,11 @@ static bool ** processMaze(const char *fileString,
     
     /* goes through each row and column and sets it to the proper value based
        on the file string 
-       NOTE: the index in the file string is: (row * rows * 2) + (col * 2) */
+       NOTE: the index in the file string is: (cols * row * 2) + (col * 2)
+             effectively this treats the 1d array as a 2d one :) */
     for(r = 0; r < rows; ++r)
         for(c = 0; c < cols; ++c)
-            maze[r][c] = (fileString[(rows * (r * 2)) + (c * 2)] == '0') ? false : true;
+            maze[r][c] = (fileString[(cols * (r * 2)) + (c * 2)] == '0') ? false : true;
     
     // we have finished building our maze we can now return it
     return maze;
@@ -103,20 +102,20 @@ static void emptyMaze(bool **maze, const size_t rows)
 }
 
 
-static void printEdgeBorder(const size_t cols)
+static void printEdgeBorder(FILE * out, const size_t cols)
 {
     // prints our top border
     for(size_t i = 0; i < cols * 2 + 3; ++i)
-        printf("%c", WALL);
+        fprintf(out, "%c", WALL);
     // prints the new line character at the end
-    printf("\n");
+    fprintf(out, "\n");
 }
 
 
 static void prettyPrintMaze(FILE * out, bool **maze, const size_t rows, const size_t cols)
 {
     // prints our top border
-    printEdgeBorder(cols);
+    printEdgeBorder(out, cols);
     
     // goes through and prints each character
     for(size_t r = 0; r < rows; ++r)
@@ -131,11 +130,11 @@ static void prettyPrintMaze(FILE * out, bool **maze, const size_t rows, const si
     }
     
     // prints our bottom border
-    printEdgeBorder(cols);
+    printEdgeBorder(out, cols);
 }
 
 
-static char * readMazeFromFile(FILE *fileIn)
+static char * readString(FILE *fileIn)
 {
     // the line buffer getline will write to
     char *buf = NULL;
@@ -146,7 +145,7 @@ static char * readMazeFromFile(FILE *fileIn)
     // copies in an empty string
     strcpy(file, "");
     
-    // while we still read in lines
+    // while we still have lines to read
     while(getline(&buf, &bufsize, fileIn) > 0)
         fileCat(&file, buf);
     
@@ -176,38 +175,45 @@ static bool ** createEmptyVisitedMap(size_t rows, size_t cols)
 }
 
 
+static void clearVisitedMap(bool ** visited, size_t rows)
+{
+    // contiguously allocates the columns for each row
+    for(size_t r = 0; r < rows; ++r)
+        free(visited[r]);
+        
+    // this method is used so that all values are false upon return
+    free(visited);
+}
+
+
 static bool isExit(QNode location, size_t rows, size_t cols)
 {
     // if we are at rows-1 and cols-1 we can say we have found the solution
-    return (location->x == rows-1 && location->y == cols-1) ? true : false;
+    return (location->row == rows-1 && location->col == cols-1) ? true : false;
 }
 
 
 static void getNeighbors(bool ** maze, bool ** visited, QNode findFor, 
                          Queue queue, size_t rows, size_t cols)
-{
-    // from location S
-    //                  - <- (x - 1, y)
-    //  (x, y - 1) -> - S - <- (x, y + 1)
-    //    (x + 1, y) -> -  
-    
+{    
     // the location we are searching from
-    size_t x = findFor->x, y = findFor->y;
+    size_t row = findFor->row, col = findFor->col;
     // the number of steps if node is valid
     int numSteps = findFor->steps + 1;
     
-    // determines if EAST neighbor is valid and adds it to queue if it is
-    if(y + 1 < cols && !maze[x][y+1] && !visited[x][y+1])
-        que_insert(queue, x, y+1, numSteps);
+    // determines if EAST neighbor is valid and adds it to queue if it is;
+    // determined by: valid location, not a wall, and not already visited
+    if(col + 1 < cols && !maze[row][col+1] && !visited[row][col+1])
+        que_insert(queue, row, col+1, numSteps);
     // SOUTH...
-    if(x + 1 < rows && !maze[x+1][y] && !visited[x+1][y])
-        que_insert(queue, x+1, y, numSteps);
+    if(row + 1 < rows && !maze[row+1][col] && !visited[row+1][col])
+        que_insert(queue, row+1, col, numSteps);
     // WEST...
-    if(y != 0 && !maze[x][y-1] && !visited[x][y-1])
-        que_insert(queue, x, y-1, numSteps);
+    if(col != 0 && !maze[row][col-1] && !visited[row][col-1])
+        que_insert(queue, row, col-1, numSteps);
     // NORTH...
-    if(x != 0 && !maze[x-1][y] && !visited[x-1][y])
-        que_insert(queue, x-1, y, numSteps);
+    if(row != 0 && !maze[row-1][col] && !visited[row-1][col])
+        que_insert(queue, row-1, col, numSteps);
 }
 
 
@@ -235,6 +241,7 @@ static int findSolution(bool ** maze, size_t rows, size_t cols)
     // used to keep track of visited nodes    
     visited = createEmptyVisitedMap(rows, cols);
     
+    
     // maybe throw into bfs function?
     // keeps going while we still have queue space
     while(!que_empty(q))
@@ -243,7 +250,7 @@ static int findSolution(bool ** maze, size_t rows, size_t cols)
         searching = que_remove(q);
         
         // marks point x , y as visited
-        visited[searching->y][searching->x] = true;
+        visited[searching->row][searching->col] = true;
         
         // if we are at solution we need to teardown
         if(isExit(searching, rows, cols))
@@ -268,6 +275,11 @@ static int findSolution(bool ** maze, size_t rows, size_t cols)
     // might be empty already but hey that's okay
     que_destroy(q);
     q = NULL;
+    
+    
+    // clears our matrix
+    clearVisitedMap(visited, rows);
+    visited = NULL;
 
     // if steps is STILL -1 here we have run out of spaces to inspect and there
     // is no solution
@@ -290,6 +302,7 @@ int main(int argc, char **argv)
     
     // begins the processing of the flags
     int opt;
+    
     // parses our flags (if any are present)
     while((opt = getopt(argc, argv, "hbsmpi:o:")) != -1)
     {
@@ -301,7 +314,7 @@ int main(int argc, char **argv)
                 return EXIT_SUCCESS;
                 break;
             // flad which will add border and pretty print the read in maze
-            case 'b': 
+            case 'b':
                 prettyPrint = 1;
                 break;
             // flag to print the number of steps in the solution
@@ -322,21 +335,27 @@ int main(int argc, char **argv)
                 fileIn = fopen(optarg, "r");
                 // if the file doesn't exist (i.e. fopen returns NULL), print err.
                 if(fileIn == NULL)
+                {
                     perror("Error opening input file");
+                    return EXIT_FAILURE;
+                }
                 break;
             case 'o':
-                // open our output file in a+ mode which will create the file
-                // if it doesn't exist
-                fileOut = fopen(optarg, "a+");
+                // open our output file in w+ mode which will create the file
+                // if it doesn't exist and overwrite if it does
+                fileOut = fopen(optarg, "w+");
                 // if we have an error we report it here
                 if(fileOut == NULL)
+                {
                     perror("Error opening output file");
+                    return EXIT_FAILURE;
+                }
                 break;
         }
     }
     
     // reads in our file string
-    char *file = readMazeFromFile(fileIn);
+    char *fileString = readString(fileIn);
     
     // we are done reading in from the file, close it if necessary
     if(fileIn != stdin)
@@ -345,18 +364,21 @@ int main(int argc, char **argv)
     /* prints our matrix if we were asked to do so by the user
        there is a new line at the end of our matrix, we don't need an extra */
     if(matrix)
-        fprintf(fileOut, "Read this matrix:\n%s", file);
+        fprintf(fileOut, "Read this matrix:\n%s", fileString);
     
     // determines the number of columns and rows we are dealing with
-    cols = getNumCols(file);
-    rows = (strlen(file) / (2 * cols));
+    cols = getNumCols(fileString);
+    // rows is the length of the string / twice the number of cols
+    // this is because there are spaces or new lines separating each column, 
+    // thus we need to account for that.
+    rows = (strlen(fileString) / (2 * cols));
     
     // process file string to create our maze
-    bool **maze = processMaze(file, rows, cols);
+    bool **maze = processMaze(fileString, rows, cols);
     
     // file is all done, we can free it here and set file to NULL
-    free(file);
-    file = NULL;
+    free(fileString);
+    fileString = NULL;
 
     // if the user wants the number of steps to find solution, print that now
     if(solutionSteps)
@@ -365,7 +387,7 @@ int main(int argc, char **argv)
         
         // wish this would work with ternary...
         if (steps != -1)
-            fprintf(fileOut, "Found solution in %d steps\n", steps);
+            fprintf(fileOut, "Found solution in %d steps.\n", steps);
         else
             fprintf(fileOut, "No solution.\n");
     }
