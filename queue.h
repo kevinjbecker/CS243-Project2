@@ -56,14 +56,16 @@ void que_clear( Queue queue );
 /// place for the insertion.
 ///
 /// @param queue the Queue into which the value is to be inserted.
-/// @param data the data to be inserted.
+/// @param row  the row of the node to be inserted.
+/// @param col  the col of the node to be inserted.
+/// @param steps  the number of steps to get to the node.
 /// @exception If the value cannot be inserted into the queue for
 ///     whatever reason (usually implementation-dependent), the program
 ///     should terminate with an error message.  This can be done by
 ///     printing an appropriate message to the standard error output and
 ///     then exiting with EXIT_FAILURE, or by having an assert() fail.
 ///
-void que_insert( Queue queue, size_t row, size_t col, size_t steps );
+void que_insert( Queue queue, size_t row, size_t col, size_t steps);
 
 ///
 /// Remove and return the first element from the Queue.

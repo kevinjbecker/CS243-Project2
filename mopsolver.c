@@ -18,8 +18,8 @@
 #include "queue.h" // queue related items
 
 // used in our pretty-print function
-#define WALL 'O'
-#define EMPTY ' '
+static char wall = 'O';
+static char empty = ' ';
 
 
 ///
@@ -27,7 +27,7 @@
 ///
 /// Description: Prints a help menu when the user asks for it.
 ///
-/// @param start  The way the program was initially run.
+/// @param *start  The way the program was initially run.
 ///
 static void printHelpMsg(char *start)
 {
@@ -39,27 +39,28 @@ static void printHelpMsg(char *start)
            "-b Add borders and pretty-print.     (Default: off)\n"
            "-s Add shortest solution step total. (Default: off)\n"
            "-m Print matrix after reading.       (Default: off)\n"
-           //"-p Print solution with path.         (Default: off)\n"
            "-i INFILE Read maze from INFILE      (Default: stdin)\n"
            "-o OUTFILE Write maze to OUTFILE     (Default: stdout)\n", start);
 }
 
 
 ///
-/// Function:
+/// Function: getNumCols
 ///
-/// Description:
+/// Description: Gets the number of columns in the maze.
 ///
+/// @param *file  The string representation of the maze.
 ///
+/// @return the number of columns in the maze.
 ///
-static size_t getNumCols(const char *file)
+static size_t getNumCols(const char *fileString)
 {
     // index counter, cols counter
     size_t i = 0, cols = 0;
     
     // counts the number of non-space characters before first new line
-    while(file[i] != '\n')
-        if(file[i++] != ' ')
+    while(fileString[i] != '\n')
+        if(fileString[i++] != ' ')
             ++cols;
     
     // returns the number of columns we have
@@ -67,6 +68,15 @@ static size_t getNumCols(const char *file)
 }
 
 
+///
+/// Function: hasTrailingSpace
+///
+/// Description: Determines if there is an extra space at the end of each line.
+///
+/// @param *fileString  The string representation of the maze.
+///
+/// @return true if there is a trailing space; false otherwise.
+///
 static bool hasTrailingSpace(const char *fileString)
 {
     // index variable
@@ -82,11 +92,15 @@ static bool hasTrailingSpace(const char *fileString)
 
 
 ///
-/// Function:
+/// Function: createMaze
 ///
-/// Description:
+/// Description: Creates a 2d array representing the maze input at the start.
 ///
+/// @param *fileString  The string representation of the maze.
+/// @param rows  The number of rows in the maze.
+/// @param cols  The number of columns in the maze.
 ///
+/// @return the maze represented as a 2d array of booleans.
 ///
 static bool ** createMaze(const char *fileString,
                           const size_t rows,
@@ -127,11 +141,12 @@ static bool ** createMaze(const char *fileString,
 
 
 ///
-/// Function:
+/// Function: clearMaze
 ///
-/// Description:
+/// Description: Frees the maze from heapspace.
 ///
-///
+/// @param **maze  The maze to free.
+/// @param rows  The number of rows in the maze.
 ///
 static void clearMaze(bool **maze, const size_t rows)
 {
@@ -145,28 +160,32 @@ static void clearMaze(bool **maze, const size_t rows)
 
 
 ///
-/// Function:
+/// Function: printEdgeBorder
 ///
-/// Description:
+/// Description: Prints the border on the edge of the maze when pretty-printing.
 ///
-///
+/// @param out  The file where the maze should be printed.
+/// @param cols  The number of columns in the maze.
 ///
 static void printEdgeBorder(FILE * out, const size_t cols)
 {
     // prints our top border
     for(size_t i = 0; i < cols * 2 + 3; ++i)
-        fprintf(out, "%c", WALL);
+        fprintf(out, "%c", wall);
     // prints the new line character at the end
     fprintf(out, "\n");
 }
 
 
 ///
-/// Function:
+/// Function: prettyPrintMaze
 ///
-/// Description:
+/// Description: Prints the maze in a nice format with a border.
 ///
-///
+/// @param *out  The file where the maze should be printed.
+/// @param **maze  The maze to print.
+/// @param rows  The number of rows in the maze.
+/// @param cols  The number of columns in the maze.
 ///
 static void prettyPrintMaze(FILE * out,
                             bool **maze,
@@ -180,12 +199,12 @@ static void prettyPrintMaze(FILE * out,
     for(size_t r = 0; r < rows; ++r)
     {
         // if r is anything but 0, print a wall (border)
-        fprintf(out, "%c", (r) ? WALL : EMPTY);
+        fprintf(out, "%c", (r) ? wall : empty);
         // prints the maze itself
         for(size_t c = 0; c < cols; ++c)
-            fprintf(out, " %c", (maze[r][c]) ? WALL : EMPTY);
+            fprintf(out, " %c", (maze[r][c]) ? wall : empty);
         // if r is anything but rows-1 print a wall (border)
-        fprintf(out, " %c\n", (r != rows-1) ? WALL : EMPTY);
+        fprintf(out, " %c\n", (r != rows-1) ? wall : empty);
     }
     
     // prints our bottom border
@@ -194,13 +213,17 @@ static void prettyPrintMaze(FILE * out,
 
 
 ///
-/// Function:
+/// Function: createEmptyVisitedMap
 ///
-/// Description:
+/// Description: Creates a 2d array of bools which will be used to keep track of
+///              visitation.
 ///
+/// @param rows  The number of rows in the maze.
+/// @param cols  The number of columns in the maze.
 ///
+/// @return A 2d array of booleans all set to false.
 ///
-static bool ** createEmptyVisitedMap(size_t rows, size_t cols)
+static bool ** createEmptyVisitedMap(const size_t rows, const size_t cols)
 {
     // used to keep track of our visited nodes
     bool ** visited = NULL;
@@ -218,13 +241,14 @@ static bool ** createEmptyVisitedMap(size_t rows, size_t cols)
 
 
 ///
-/// Function:
+/// Function: clearVisitedMap
 ///
-/// Description:
+/// Description: Frees the visitation map from heapspace.
 ///
+/// @param ** visited  The visitation map to free.
+/// @param rows  The number of rows in the maze.
 ///
-///
-static void clearVisitedMap(bool ** visited, size_t rows)
+static void clearVisitedMap(bool ** visited, const size_t rows)
 {
     // contiguously allocates the columns for each row
     for(size_t r = 0; r < rows; ++r)
@@ -236,13 +260,17 @@ static void clearVisitedMap(bool ** visited, size_t rows)
 
 
 ///
-/// Function:
+/// Function: isExit
 ///
-/// Description:
+/// Description: Determines if at the exit of the maze.
 ///
+/// @param location  The QNode of the location we are checking.
+/// @param rows  The number of rows in the maze.
+/// @param cols  The number of columns in the maze.
 ///
+/// @return true if at exit; false otherwise.
 ///
-static bool isExit(QNode location, size_t rows, size_t cols)
+static bool isExit(QNode location, const size_t rows, const size_t cols)
 {
     // if we are at rows-1 and cols-1 we can say we have found the solution
     return (location->row == rows-1 && location->col == cols-1) ? true : false;
@@ -250,14 +278,23 @@ static bool isExit(QNode location, size_t rows, size_t cols)
 
 
 ///
-/// Function:
+/// Function: getNeighbors
 ///
-/// Description:
+/// Description: Gets the neighbors of a certain location in the maze.
 ///
+/// @param maze  The boolean representation of the maze.
+/// @param visited  The boolean representation of the visitation maze.
+/// @param findFor  The node we are looking to find the neighbors of.
+/// @param queue  The queue we will insert neighbors to.
+/// @param rows  The number of rows in the maze.
+/// @param cols  The number of columns in the maze.
 ///
-///
-static void getNeighbors(bool ** maze, bool ** visited, QNode findFor,
-                         Queue queue, size_t rows, size_t cols)
+static void getNeighbors(bool ** maze,
+                         bool ** visited,
+                         QNode findFor,
+                         Queue queue,
+                         const size_t rows,
+                         const size_t cols)
 {    
     // the location we are searching from
     size_t row = findFor->row, col = findFor->col;
@@ -295,13 +332,19 @@ static void getNeighbors(bool ** maze, bool ** visited, QNode findFor,
 
 
 ///
-/// Function:
+/// Function: findSolution
 ///
-/// Description:
+/// Description: Uses BFS to determine the shortest number of steps from start
+///              to finish.
 ///
+/// @param **maze  The boolean representation of the maze.
+/// @param rows  The number of rows in our maze.
+/// @param cols  The number of columns in our maze.
 ///
+/// @return 0 if no path, otherwise the number of steps to get to the exit of
+///         the maze.
 ///
-static size_t findSolution(bool ** maze, size_t rows, size_t cols)
+static size_t findSolution(bool ** maze, const size_t rows, const size_t cols)
 {
     /* we first check that the last and first spaces are open
        waste of time if we can't get in/out of the maze */
@@ -373,11 +416,12 @@ static size_t findSolution(bool ** maze, size_t rows, size_t cols)
 
 
 ///
-/// Function:
+/// Function: main
 ///
-/// Description:
+/// Description: Runs an instance of mopsolver.
 ///
-///
+/// @param argc  The number of arguments given upon start.
+/// @param ** argv  The string arguments used to launch the program.
 ///
 int main(int argc, char **argv)
 {
@@ -505,4 +549,3 @@ int main(int argc, char **argv)
     // lastly we need to return that we have successfully run the program
     return EXIT_SUCCESS;
 }
-
