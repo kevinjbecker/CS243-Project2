@@ -25,20 +25,14 @@
 ///
 static void fileStringCat(char **fileString, char *str)
 {
-    // gets the length of the string
-    size_t length = strlen(str);
-    // if it is odd, we might have a trailing space (need to deal with that)
-    if(length % 2 == 1)
-    {
-        str[length-2] = '\n';
-        --length;
-    }
+    // computes the new size of the fileString
+    size_t newSize = (strlen(*fileString) + strlen(str) + 1);
 
-    // resizes the "file" string
-    *fileString = realloc(*fileString, (strlen(*fileString) + strlen(str) + 1));
+    // resizes the fileString
+    *fileString = realloc(*fileString, newSize);
 
     //concatenates the strings together
-    strncat(*fileString, str, length);
+    strcat(*fileString, str);
 }
 
 ///
@@ -48,7 +42,6 @@ static void fileStringCat(char **fileString, char *str)
 ///
 /// @return A string read in from the stdin buffer.
 ///
-
 static char * readFromStdin()
 {
     // the line buffer getline will write to

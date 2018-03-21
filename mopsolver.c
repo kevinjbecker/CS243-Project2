@@ -67,6 +67,20 @@ static size_t getNumCols(const char *file)
 }
 
 
+static bool hasTrailingSpace(const char *fileString)
+{
+    // index variable
+    size_t i = 0;
+
+    /* we can pre-increment because there will NEVER be a newline at position 0
+       searches until we find a new line character */
+    while(fileString[++i] != '\n');
+
+    // returns if the character before the new line was a space or not
+    return fileString[i-1] == ' ';
+}
+
+
 ///
 /// Function:
 ///
@@ -74,15 +88,15 @@ static size_t getNumCols(const char *file)
 ///
 ///
 ///
-static bool ** processMazeFromFileString(const char *fileString,
-                           const size_t rows, 
-                           const size_t cols)
+static bool ** createMaze(const char *fileString,
+                          const size_t rows,
+                          const size_t cols)
 {
     // row/column index counters
-    size_t r, c;
+    size_t r, c, index;
     
     // our eventual storage location for our maze
-    bool **maze = NULL;
+    bool **maze = NULL, trailingSpace = hasTrailingSpace(fileString);
     // contiguously allocates the right number of rows
     maze = calloc(sizeof(bool *), rows);
     
@@ -96,7 +110,16 @@ static bool ** processMazeFromFileString(const char *fileString,
              effectively this treats the 1d array as a 2d one :) */
     for(r = 0; r < rows; ++r)
         for(c = 0; c < cols; ++c)
-            maze[r][c] = (fileString[(cols * (r * 2)) + (c * 2)] == '0') ? false : true;
+        {
+            // determines the index in the fileString we need to look at
+            index = (cols * (r * 2)) + (c * 2);
+
+            // adds r to index if we have a trailing space to account for space
+            if(trailingSpace)
+                index += r;
+
+            maze[r][c] = (fileString[index] == '0') ? false : true;
+        }
     
     // we have finished building our maze we can now return it
     return maze;
@@ -145,7 +168,10 @@ static void printEdgeBorder(FILE * out, const size_t cols)
 ///
 ///
 ///
-static void prettyPrintMaze(FILE * out, bool **maze, const size_t rows, const size_t cols)
+static void prettyPrintMaze(FILE * out,
+                            bool **maze,
+                            const size_t rows,
+                            const size_t cols)
 {
     // prints our top border
     printEdgeBorder(out, cols);
@@ -230,7 +256,7 @@ static bool isExit(QNode location, size_t rows, size_t cols)
 ///
 ///
 ///
-static void getNeighbors(bool ** maze, bool ** visited, QNode findFor, 
+static void getNeighbors(bool ** maze, bool ** visited, QNode findFor,
                          Queue queue, size_t rows, size_t cols)
 {    
     // the location we are searching from
@@ -240,8 +266,8 @@ static void getNeighbors(bool ** maze, bool ** visited, QNode findFor,
     
     // determines if EAST neighbor is valid and adds it to queue if it is;
     // determined by: valid location, not a wall, and not already visited
-    // NOTE: for memory's sake, we mark it as visited here SO THE SAME NODE ISN'T
-    //       ADDED MORE THAN ONCE.  Saves memory AND time.
+    // NOTE: for memory's sake, we mark it as visited here SO THE SAME NODE IS
+    //       NOT ADDED MORE THAN ONCE
     if(col + 1 < cols && !maze[row][col+1] && !visited[row][col+1])
     {
         que_insert(queue, row, col+1, numSteps);
@@ -443,7 +469,7 @@ int main(int argc, char **argv)
     rows = (strlen(fileString) / (2 * cols));
     
     // process file string to create our maze--a boolean matrix
-    bool **maze = processMazeFromFileString(fileString, rows, cols);
+    bool **maze = createMaze(fileString, rows, cols);
     
     // file is all done, we can free it here and set file to NULL
     free(fileString);
