@@ -91,15 +91,15 @@ void que_destroy( Queue queue )
 
 
 /// inserts our coordinates
-void que_insert( Queue queue, size_t x, size_t y, int steps )
+void que_insert( Queue queue, size_t row, size_t col, size_t steps )
 {
     // creates a new node with data of data
     QNode newNode = NULL;
     // allocates enough space for our QNode on the heap
     newNode = malloc(sizeof(struct qnode_s));
     // sets our data in place
-    newNode->x = x;
-    newNode->y = y;
+    newNode->row = row;
+    newNode->col = col;
     newNode->steps = steps;
     // our new QNode might have something behind it, but we don't know
     newNode->behind = NULL;

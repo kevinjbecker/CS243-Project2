@@ -24,8 +24,7 @@
 // our storage unit
 typedef struct qnode_s{
     struct qnode_s *behind;
-    size_t x, y; // the x and y coordinates
-    int steps; // number of steps to this location
+    size_t row, col, steps; // the x and y coordinates and steps to location
 } * QNode;
 
 // Queue structure
@@ -38,25 +37,13 @@ typedef struct queue_s{
     size_t size;
 } * Queue;
 
-/// Create a Queue
-/// routine.
-///
-/// The comparison function takes two void * parameters, and returns
-/// an integer result which indicates the relationship between the
-/// two things:
-///
-///	Result	Relationship
-///	======	===========
-///	 < 0	a < b
-///	 = 0	a == b
-///	 > 0	a > b
-///
-/// where ">" and "<" are dependent upon the data being compared
+/// 
+/// Create a Queue routine.
 ///
 /// @return a Queue instance, or NULL if the allocation fails
 Queue que_create();
 
-/// Tear down and deallocate the supplied QueuADT.
+/// Tear down and deallocate the supplied Queue.
 ///
 /// @param queue - the Queue to be manipulated
 void que_destroy( Queue queue );
@@ -78,7 +65,7 @@ void que_clear( Queue queue );
 ///     should terminate with an error message.  This can be done by
 ///     printing an appropriate message to the standard error output and
 ///     then exiting with EXIT_FAILURE, or by having an assert() fail.
-void que_insert( Queue queue, size_t x, size_t y, int steps );
+void que_insert( Queue queue, size_t row, size_t col, size_t steps );
 
 /// Remove and return the first element from the Queue.
 ///

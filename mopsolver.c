@@ -5,9 +5,8 @@
 ///              the shortest distance from start to finish.
 ///
 /// @author kjb2503 : Kevin Becker
+///
 // // // // // // // // // // // // // // // // // // // // // // // // // // //
-
-// TODO: make sure all references are actually using the correct x and y
 
 #define _DEFAULT_SOURCE
 #include <unistd.h> // getopt
@@ -15,6 +14,7 @@
 #include <stdbool.h> // boolean items
 #include <string.h> // string functions
 #include <stdlib.h> // allocation functions
+#include "fileRead.h" // reading in the file
 #include "queue.h" // queue related items
 
 // used in our pretty-print function
@@ -22,7 +22,7 @@
 #define EMPTY ' '
 
 
-void printHelpMsg(char *start)
+static void printHelpMsg(char *start)
 {
     // prints usage and exits
     printf("Usage:\n"
@@ -35,16 +35,6 @@ void printHelpMsg(char *start)
            //"-p Print solution with path.         (Default: off)\n"
            "-i INFILE Read maze from INFILE      (Default: stdin)\n"
            "-o OUTFILE Write maze to OUTFILE     (Default: stdout)\n", start);
-}
-
-
-static void fileCat(char **file, const char *str)
-{
-    // resizes the "file" string
-    *file = realloc(*file, (strlen(*file) + strlen(str) + 1));
-    
-    //concatenates the strings
-    strcat(*file, str);
 }
 
 
@@ -63,7 +53,7 @@ static size_t getNumCols(const char *file)
 }
 
 
-static bool ** processMaze(const char *fileString,
+static bool ** processMazeFromFileString(const char *fileString,
                            const size_t rows, 
                            const size_t cols)
 {
@@ -91,7 +81,7 @@ static bool ** processMaze(const char *fileString,
     return maze;
 }
 
-static void emptyMaze(bool **maze, const size_t rows)
+static void clearMaze(bool **maze, const size_t rows)
 {
     // frees each individual row
     for(size_t r = 0; r < rows; ++r)
@@ -131,30 +121,6 @@ static void prettyPrintMaze(FILE * out, bool **maze, const size_t rows, const si
     
     // prints our bottom border
     printEdgeBorder(out, cols);
-}
-
-
-static char * readString(FILE *fileIn)
-{
-    // the line buffer getline will write to
-    char *buf = NULL;
-    // the line size which getline will change
-    size_t bufsize = 0;
-    // allocates our empty file string
-    char *file = malloc(strlen("") +1);
-    // copies in an empty string
-    strcpy(file, "");
-    
-    // while we still have lines to read
-    while(getline(&buf, &bufsize, fileIn) > 0)
-        fileCat(&file, buf);
-    
-    // frees our buffer; we're done with it
-    free(buf);
-    buf = NULL;
-    
-    // return our file
-    return file;
 }
 
 
@@ -199,7 +165,7 @@ static void getNeighbors(bool ** maze, bool ** visited, QNode findFor,
     // the location we are searching from
     size_t row = findFor->row, col = findFor->col;
     // the number of steps if node is valid
-    int numSteps = findFor->steps + 1;
+    size_t numSteps = findFor->steps + 1;
     
     // determines if EAST neighbor is valid and adds it to queue if it is;
     // determined by: valid location, not a wall, and not already visited
@@ -209,22 +175,24 @@ static void getNeighbors(bool ** maze, bool ** visited, QNode findFor,
     if(row + 1 < rows && !maze[row+1][col] && !visited[row+1][col])
         que_insert(queue, row+1, col, numSteps);
     // WEST...
-    if(col != 0 && !maze[row][col-1] && !visited[row][col-1])
+    if(col > 0 && !maze[row][col-1] && !visited[row][col-1])
         que_insert(queue, row, col-1, numSteps);
     // NORTH...
-    if(row != 0 && !maze[row-1][col] && !visited[row-1][col])
+    if(row > 0 && !maze[row-1][col] && !visited[row-1][col])
         que_insert(queue, row-1, col, numSteps);
 }
 
 
 static int findSolution(bool ** maze, size_t rows, size_t cols)
 {
-    // we first check that the last and first spaces are open
-    // waste of time if we can't get in/out of the maze
+    /* we first check that the last and first spaces are open
+       waste of time if we can't get in/out of the maze */
     if(maze[rows-1][cols-1] || maze[0][0])
-        return -1;
+        return 0;
 
-    int steps = -1;
+    // the number of steps
+    size_t steps = 0;
+    
     // the queue of nodes left to search
     Queue q;
     // the node currently being searched
@@ -235,15 +203,14 @@ static int findSolution(bool ** maze, size_t rows, size_t cols)
     // creates a new queue here which will be used for BFS
     q = que_create();
     
-    // inserts a node at (0,0) with 1 step
+    // inserts a node at (0,0) with 1 step (we must step into the maze first)
     que_insert(q, 0, 0, 1);
     
     // used to keep track of visited nodes    
     visited = createEmptyVisitedMap(rows, cols);
     
     
-    // maybe throw into bfs function?
-    // keeps going while we still have queue space
+    // keeps going while we still have queue nodes
     while(!que_empty(q))
     {
         // removes the next QNode
@@ -271,8 +238,8 @@ static int findSolution(bool ** maze, size_t rows, size_t cols)
     free(searching);
     searching = NULL;
     
-    // destroys the remaining queue (we don't care, we've found shortest path)
-    // might be empty already but hey that's okay
+    /* destroys the remaining queue (we don't care, we've found shortest path)
+       might be empty already but hey that's okay */
     que_destroy(q);
     q = NULL;
     
@@ -281,8 +248,8 @@ static int findSolution(bool ** maze, size_t rows, size_t cols)
     clearVisitedMap(visited, rows);
     visited = NULL;
 
-    // if steps is STILL -1 here we have run out of spaces to inspect and there
-    // is no solution
+    /* if steps is STILL 0 here we have run out of spaces to inspect and there
+       is no solution */
     return steps;
 }
 
@@ -293,17 +260,15 @@ int main(int argc, char **argv)
     unsigned char prettyPrint = 0, solutionSteps = 0, matrix = 0, path = 0;
     
     // holds the number of rows and columns in our matrix
-    size_t rows = 0, cols = 0;
-    
-    int steps = -1;
+    size_t rows = 0, cols = 0, steps = 0;
     
     // sets our default file in and out
     FILE *fileIn = stdin, *fileOut = stdout;
     
-    // begins the processing of the flags
+    // used for processing the flags
     int opt;
     
-    // parses our flags (if any are present)
+    // processes our flags (if any are present)
     while((opt = getopt(argc, argv, "hbsmpi:o:")) != -1)
     {
         switch(opt)
@@ -333,7 +298,8 @@ int main(int argc, char **argv)
             case 'i':
                 // opens the in file in read-only mode
                 fileIn = fopen(optarg, "r");
-                // if the file doesn't exist (i.e. fopen returns NULL), print err.
+                /* if the file doesn't exist (i.e. fopen returns NULL), print
+                   the error and exit */
                 if(fileIn == NULL)
                 {
                     perror("Error opening input file");
@@ -341,10 +307,10 @@ int main(int argc, char **argv)
                 }
                 break;
             case 'o':
-                // open our output file in w+ mode which will create the file
-                // if it doesn't exist and overwrite if it does
+                /* open our output file in w+ mode which will create the file
+                   if it doesn't exist and overwrite if it does */
                 fileOut = fopen(optarg, "w+");
-                // if we have an error we report it here
+                // if we have an error we report it here and exit
                 if(fileOut == NULL)
                 {
                     perror("Error opening output file");
@@ -354,10 +320,11 @@ int main(int argc, char **argv)
         }
     }
     
-    // reads in our file string
-    char *fileString = readString(fileIn);
     
-    // we are done reading in from the file, close it if necessary
+    // gets our file as a string (found in fildRead.c)
+    char *fileString = getFileAsString(fileIn);
+    
+    // we are done reading in from the file at this point, close it if necessary
     if(fileIn != stdin)
         fclose(fileIn);
     
@@ -368,13 +335,13 @@ int main(int argc, char **argv)
     
     // determines the number of columns and rows we are dealing with
     cols = getNumCols(fileString);
-    // rows is the length of the string / twice the number of cols
-    // this is because there are spaces or new lines separating each column, 
-    // thus we need to account for that.
+    /* rows is the length of the string divided by twice the number of cols
+       this is because there are spaces or new lines separating each column, 
+       thus we need to account for that. */
     rows = (strlen(fileString) / (2 * cols));
     
-    // process file string to create our maze
-    bool **maze = processMaze(fileString, rows, cols);
+    // process file string to create our maze--a boolean matrix
+    bool **maze = processMazeFromFileString(fileString, rows, cols);
     
     // file is all done, we can free it here and set file to NULL
     free(fileString);
@@ -383,11 +350,13 @@ int main(int argc, char **argv)
     // if the user wants the number of steps to find solution, print that now
     if(solutionSteps)
     {
+        /* steps is set to the return of findSolution which returns the number
+           of steps in the shortest path */
         steps = findSolution(maze, rows, cols);
         
-        // wish this would work with ternary...
-        if (steps != -1)
-            fprintf(fileOut, "Found solution in %d steps.\n", steps);
+        // if steps is not -1 (a.k.a. there WAS a path), that is returned here.
+        if (steps > 0)
+            fprintf(fileOut, "Found solution in %zu steps.\n", steps);
         else
             fprintf(fileOut, "No solution.\n");
     }
@@ -397,14 +366,14 @@ int main(int argc, char **argv)
         prettyPrintMaze(fileOut, maze, rows, cols);
 
     // empties out the maze since it is done
-    emptyMaze(maze, rows);
+    clearMaze(maze, rows);
     maze = NULL;
-    
     
     // if we need to close the output file we do it right before exit
     if(fileOut != stdout)
         fclose(fileOut);
         
+    // lastly we need to return that we have successfully run the program
     return EXIT_SUCCESS;
 }
 
