@@ -232,11 +232,15 @@ static int findSolution(bool ** maze, size_t rows, size_t cols)
         
         // we're done with searching, we can free it
         free(searching);
+        searching = NULL;
     }
     
-    // frees our searching node
-    free(searching);
-    searching = NULL;
+    // frees our searching node if it isn't NULL
+    if(searching != NULL)
+    {
+        free(searching);
+        searching = NULL;
+    }
     
     /* destroys the remaining queue (we don't care, we've found shortest path)
        might be empty already but hey that's okay */
@@ -356,7 +360,7 @@ int main(int argc, char **argv)
         
         // if steps is not -1 (a.k.a. there WAS a path), that is returned here.
         if (steps > 0)
-            fprintf(fileOut, "Found solution in %zu steps.\n", steps);
+            fprintf(fileOut, "Solution in %zu steps.\n", steps);
         else
             fprintf(fileOut, "No solution.\n");
     }
